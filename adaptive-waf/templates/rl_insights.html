@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block title %}RL Insights{% endblock %}
+{% block page_title %}RL Explainability & Insights{% endblock %}
+{% block content %}
+
+<!-- Performance Metrics -->
+<div class="row g-3 mb-4">
+  {% for label, val, color in [
+    ('Accuracy', accuracy, 'cyber-green'),
+    ('Precision', precision, 'cyber-blue'),
+    ('Recall', recall, 'warning'),
+    ('F1-Score', f1, 'info'),
+  ] %}
+  <div class="col-xl-3 col-md-6">
+    <div class="glass-card text-center py-4">
+      <div class="circular-progress-wrap">
+        <svg viewBox="0 0 80 80" width="90" height="90">
+          <circle cx="40" cy="40" r="34" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="8"/>
+          <circle cx="40" cy="40" r="34" fill="none"
+                  stroke="{% if color=='cyber-green' %}#00ff88{% elif color=='cyber-blue' %}#00d4ff{% elif color=='warning' %}#ffc107{% else %}#0dcaf0{% endif %}"
+                  stroke-width="8" stroke-linecap="round"
+                  stroke-dasharray="{{ val * 2.136 }} 213.6"
+                  transform="rotate(-90 40 40)"/>
+          <text x="40" y="45" text-anchor="middle" fill="white" font-size="13" font-weight="bold">{{ val }}%</text>
+        </svg>
+      </div>
+      <div class="mt-2 fw-semibold">{{ label }}</div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Confusion Matrix + RL Comparison -->
+<div class="row g-3 mb-4">
+  <div class="col-xl-4">
+    <div class="glass-card h-100">
+      <div class="card-header-cyber"><i class="bi bi-grid me-2"></i>Confusion Matrix</div>
+      <div class="card-body">
+        <div class="confusion-matrix">
+          <div class="cm-axis-label cm-x-label">Predicted</div>
+          <div class="cm-axis-label cm-y-label">Actual</div>
+          <table class="cm-table">
+            <thead><tr><th></th><th class="text-success">Benign</th><th class="text-danger">Malicious</th></tr></thead>
+            <tbody>
+              <tr>
+                <th class="text-success">Benign</th>
+                <td class="cm-cell cm-tp">{{ tn }}<small>TN</small></td>
+                <td class="cm-cell cm-fp">{{ fp }}<small>FP</small></td>
+              </tr>
+              <tr>
+                <th class="text-danger">Malicious</th>
+                <td class="cm-cell cm-fn">{{ fn }}<small>FN</small></td>
+                <td class="cm-cell cm-tn">{{ tp }}<small>TP</small></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="mt-3">
+          <div class="rl-stat"><span>True Positives</span><span class="text-success">{{ tp }}</span></div>
+          <div class="rl-stat"><span>False Positives</span><span class="text-danger">{{ fp }}</span></div>
+          <div class="rl-stat"><span>True Negatives</span><span class="text-cyber-green">{{ tn }}</span></div>
+          <div class="rl-stat"><span>False Negatives</span><span class="text-warning">{{ fn }}</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-8">
+    <div class="glass-card h-100">
+      <div class="card-header-cyber"><i class="bi bi-bar-chart-steps me-2"></i>Static WAF vs RL Adaptive WAF</div>
+      <div class="card-body"><canvas id="comparisonChart" height="220"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- RL Training Charts -->
+<div class="row g-3 mb-4">
+  <div class="col-xl-6">
+    <div class="glass-card">
+      <div class="card-header-cyber"><i class="bi bi-graph-up me-2"></i>Reward Curve</div>
+      <div class="card-body"><canvas id="rewardCurveChart" height="160"></canvas></div>
+    </div>
+  </div>
+  <div class="col-xl-6">
+    <div class="glass-card">
+      <div class="card-header-cyber"><i class="bi bi-activity me-2"></i>Loss Curve + Epsilon Decay</div>
+      <div class="card-body"><canvas id="lossCurveChart" height="160"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- Action Distribution + Agent Stats -->
+<div class="row g-3 mb-4">
+  <div class="col-xl-4">
+    <div class="glass-card h-100">
+      <div class="card-header-cyber"><i class="bi bi-pie-chart me-2"></i>Action Distribution</div>
+      <div class="card-body"><canvas id="actionDistChart" height="200"></canvas></div>
+    </div>
+  </div>
+  <div class="col-xl-8">
+    <div class="glass-card h-100">
+      <div class="card-header-cyber"><i class="bi bi-cpu me-2"></i>DQN Agent State</div>
+      <div class="card-body">
+        <div class="row g-3">
+          {% set stats = [
+            ('Training Steps',     agent_stats.get('steps', 0), 'text-cyber-green'),
+            ('Current Epsilon (ε)',agent_stats.get('epsilon', '—'), 'text-cyber-blue'),
+            ('Avg Reward (100)',   agent_stats.get('avg_reward_100', '—'), 'text-success'),
+            ('Cumulative Reward',  agent_stats.get('cumulative_reward', '—'), 'text-warning'),
+            ('Avg Loss',           agent_stats.get('avg_loss', '—'), 'text-danger'),
+            ('Avg Q-Value',        agent_stats.get('avg_q_value', '—'), 'text-info'),
+            ('Memory Buffer',      agent_stats.get('memory_size', 0), 'text-muted'),
+            ('Compute Device',     agent_stats.get('device', 'cpu'), 'text-muted'),
+          ] %}
+          {% for label, val, color in stats %}
+          <div class="col-md-6">
+            <div class="agent-stat-card">
+              <div class="agent-stat-label">{{ label }}</div>
+              <div class="agent-stat-value {{ color }}">{{ val }}</div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        <hr class="border-secondary"/>
+        <div class="xai-section">
+          <h6 class="text-muted small mb-2"><i class="bi bi-lightbulb me-1"></i>EXPLAINABLE AI — Decision Inspector</h6>
+          <div class="input-group">
+            <input type="number" class="form-control bg-dark border-secondary" id="xai-log-id" placeholder="Enter Request Log ID"/>
+            <button class="btn btn-cyber" onclick="explainDecision()">Explain</button>
+          </div>
+          <div class="mt-3" id="xai-result"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/rl_insights.js') }}"></script>
+{% endblock %}

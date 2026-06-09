@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+{% block title %}Firewall Rules{% endblock %}
+{% block page_title %}Firewall Rule Engine{% endblock %}
+{% block content %}
+
+<!-- Sensitivity Bar -->
+<div class="glass-card mb-4">
+  <div class="card-body d-flex align-items-center gap-4 py-3">
+    <div class="d-flex align-items-center gap-2">
+      <i class="bi bi-sliders2 text-cyber-green fs-4"></i>
+      <span class="fw-semibold">Global WAF Sensitivity</span>
+    </div>
+    <div class="flex-grow-1">
+      <input type="range" class="form-range cyber-range" id="fw-sens-slider"
+             min="10" max="95" value="{{ sensitivity }}"
+             oninput="updateFWSensitivity(this.value)"/>
+    </div>
+    <div class="sensitivity-display">
+      <span id="fw-sens-val" class="fs-5 fw-bold text-cyber-green">{{ sensitivity }}%</span>
+    </div>
+    <button class="btn btn-sm btn-outline-warning" onclick="rollbackSensitivity()">
+      <i class="bi bi-arrow-counterclockwise me-1"></i>Rollback
+    </button>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <!-- Rules Table -->
+  <div class="col-xl-8">
+    <div class="glass-card">
+      <div class="card-header-cyber d-flex justify-content-between">
+        <span><i class="bi bi-list-check me-2"></i>Active Firewall Rules ({{ rules|length }})</span>
+        <button class="btn btn-sm btn-cyber" data-bs-toggle="modal" data-bs-target="#addRuleModal">
+          <i class="bi bi-plus-circle me-1"></i>Add Rule
+        </button>
+      </div>
+      <div class="table-responsive" style="max-height:500px;overflow-y:auto">
+        <table class="table table-dark table-hover table-sm mb-0 cyber-table sticky-header">
+          <thead><tr>
+            <th>Name</th><th>Type</th><th>Severity</th><th>Hits</th><th>FP</th><th>Dynamic</th><th>Active</th><th>Actions</th>
+          </tr></thead>
+          <tbody id="rules-tbody">
+            {% for rule in rules %}
+            <tr id="rule-row-{{ rule.id }}">
+              <td>
+                <span class="fw-semibold">{{ rule.rule_name }}</span>
+                {% if rule.description %}<br><small class="text-muted">{{ rule.description[:60] }}</small>{% endif %}
+              </td>
+              <td><span class="attack-badge badge-{{ rule.rule_type }}">{{ rule.rule_type }}</span></td>
+              <td><span class="badge bg-{{ 'danger' if rule.severity=='critical' else 'warning' if rule.severity=='high' else 'info' if rule.severity=='medium' else 'secondary' }}">{{ rule.severity }}</span></td>
+              <td>{{ rule.hit_count }}</td>
+              <td>{{ rule.false_positive_count }}</td>
+              <td>{% if rule.is_dynamic %}<span class="badge bg-cyber-green text-dark">RL</span>{% else %}<span class="badge bg-secondary">Static</span>{% endif %}</td>
+              <td>
+                <div class="form-check form-switch m-0">
+                  <input class="form-check-input" type="checkbox" {% if rule.is_active %}checked{% endif %}
+                         onchange="toggleRule({{ rule.id }}, this.checked)"/>
+                </div>
+              </td>
+              <td>
+                {% if rule.is_dynamic %}
+                <button class="btn btn-xs btn-outline-danger" onclick="deleteRule({{ rule.id }})">
+                  <i class="bi bi-trash"></i>
+                </button>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Blocked IPs -->
+  <div class="col-xl-4">
+    <div class="glass-card">
+      <div class="card-header-cyber">
+        <i class="bi bi-ban me-2 text-danger"></i>Blacklisted IPs ({{ blocked_ips|length }})
+      </div>
+      <div style="max-height:500px;overflow-y:auto">
+        {% if blocked_ips %}
+        {% for bip in blocked_ips %}
+        <div class="blocked-ip-row">
+          <div class="d-flex justify-content-between align-items-start">
+            <div>
+              <code class="text-danger">{{ bip.ip_address }}</code>
+              <div class="text-muted small">{{ bip.reason[:50] if bip.reason else 'Auto-blocked' }}</div>
+              <div class="text-muted small">
+                Score: <span class="text-warning">{{ "%.2f"|format(bip.threat_score) }}</span>
+                | {{ bip.blocked_at|string|truncate(16,true,'') }}
+              </div>
+            </div>
+            <div class="d-flex flex-column gap-1 align-items-end">
+              {% if bip.is_permanent %}
+              <span class="badge bg-danger">Permanent</span>
+              {% else %}
+              <span class="badge bg-warning text-dark">Temp</span>
+              {% endif %}
+              <button class="btn btn-xs btn-outline-success" onclick="unblockIP('{{ bip.ip_address }}')">
+                <i class="bi bi-unlock"></i> Unblock
+              </button>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="text-center text-muted py-4">
+          <i class="bi bi-check-circle-fill text-success fs-3"></i>
+          <p class="mt-2">No IPs currently blacklisted</p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Rule Modal -->
+<div class="modal fade" id="addRuleModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content bg-dark border-secondary">
+      <div class="modal-header border-secondary">
+        <h5 class="modal-title"><i class="bi bi-plus-circle me-2"></i>Add Custom Rule</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">Rule Name</label>
+          <input type="text" class="form-control bg-dark border-secondary" id="new-rule-name" placeholder="My Custom Rule"/>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Attack Type</label>
+          <select class="form-select bg-dark border-secondary" id="new-rule-type">
+            <option value="sqli">SQL Injection</option><option value="xss">XSS</option>
+            <option value="cmd_inject">Command Injection</option><option value="path_traversal">Path Traversal</option>
+            <option value="custom">Custom</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Regex Pattern</label>
+          <input type="text" class="form-control bg-dark border-secondary font-monospace" id="new-rule-pattern" placeholder="(?i)(pattern)"/>
+        </div>
+        <div class="row g-2">
+          <div class="col-6">
+            <label class="form-label">Severity</label>
+            <select class="form-select bg-dark border-secondary" id="new-rule-severity">
+              <option value="low">Low</option><option value="medium" selected>Medium</option>
+              <option value="high">High</option><option value="critical">Critical</option>
+            </select>
+          </div>
+          <div class="col-6">
+            <label class="form-label">Expires (hours)</label>
+            <input type="number" class="form-control bg-dark border-secondary" id="new-rule-expires" value="24"/>
+          </div>
+        </div>
+        <div class="mb-3 mt-2">
+          <label class="form-label">Description</label>
+          <input type="text" class="form-control bg-dark border-secondary" id="new-rule-desc"/>
+        </div>
+      </div>
+      <div class="modal-footer border-secondary">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-cyber" onclick="submitNewRule()">Add Rule</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+async function toggleRule(id, active) {
+  const r = await fetch('/api/firewall/toggle-rule', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({rule_id:id, active:active})
+  });
+  const d = await r.json();
+  if (!d.success) alert('Failed to toggle rule');
+}
+async function deleteRule(id) {
+  if (!confirm('Delete dynamic rule #' + id + '?')) return;
+  const r = await fetch('/api/firewall/delete-rule', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({rule_id:id})
+  });
+  if ((await r.json()).success) document.getElementById('rule-row-'+id)?.remove();
+}
+async function unblockIP(ip) {
+  const r = await fetch('/api/firewall/unblock-ip', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ip})
+  });
+  if ((await r.json()).success) location.reload();
+}
+async function submitNewRule() {
+  const data = {
+    rule_name:    document.getElementById('new-rule-name').value,
+    rule_type:    document.getElementById('new-rule-type').value,
+    pattern:      document.getElementById('new-rule-pattern').value,
+    severity:     document.getElementById('new-rule-severity').value,
+    expires_hours:parseInt(document.getElementById('new-rule-expires').value),
+    description:  document.getElementById('new-rule-desc').value,
+  };
+  const r = await fetch('/api/firewall/add-rule', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(data)
+  });
+  if ((await r.json()).success) location.reload();
+}
+function updateFWSensitivity(val) {
+  document.getElementById('fw-sens-val').textContent = val + '%';
+  clearTimeout(window._sensTimer);
+  window._sensTimer = setTimeout(async () => {
+    await fetch('/api/firewall/sensitivity', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({level: val/100})
+    });
+  }, 500);
+}
+async function rollbackSensitivity() {
+  const r = await fetch('/api/settings/rollback', {method:'POST'});
+  const d = await r.json();
+  if (d.success) {
+    const pct = Math.round(d.level * 100);
+    document.getElementById('fw-sens-slider').value = pct;
+    document.getElementById('fw-sens-val').textContent = pct + '%';
+  }
+}
+</script>
+{% endblock %}

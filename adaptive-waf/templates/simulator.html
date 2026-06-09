@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Attack Simulator{% endblock %}
+{% block page_title %}Attack Simulator{% endblock %}
+
+{% block content %}
+<div class="row g-3 mb-3">
+  <!-- Control Panel -->
+  <div class="col-xl-4">
+    <div class="glass-card h-100">
+      <div class="card-header-cyber">
+        <i class="bi bi-bug-fill me-2 text-danger"></i>Simulation Control Panel
+      </div>
+      <div class="card-body">
+        <div class="mb-3">
+          <label class="form-label text-muted small">ATTACK TYPE</label>
+          <select class="form-select cyber-select" id="attack-type">
+            {% for at in attack_types %}
+            <option value="{{ at }}">{{ at.replace('_',' ')|upper }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label text-muted small">REQUEST COUNT: <span id="count-val">1</span></label>
+          <input type="range" class="form-range cyber-range" id="count-slider" min="1" max="50" value="1"
+                 oninput="document.getElementById('count-val').textContent=this.value"/>
+        </div>
+        <div class="mb-3 form-check form-switch">
+          <input class="form-check-input" type="checkbox" id="legit-toggle"/>
+          <label class="form-check-label text-muted">Simulate Legitimate Traffic (FP test)</label>
+        </div>
+        <div class="d-grid gap-2">
+          <button class="btn btn-danger" id="btn-fire" onclick="fireAttack()">
+            <i class="bi bi-lightning-fill me-2"></i>Fire Attack
+          </button>
+          <button class="btn btn-outline-warning" onclick="fireBurst()">
+            <i class="bi bi-broadcast me-2"></i>DDoS Burst (20 req)
+          </button>
+          <button class="btn btn-outline-info" onclick="runDemoSequence()">
+            <i class="bi bi-play-circle me-2"></i>Run Demo Sequence
+          </button>
+          <button class="btn btn-outline-secondary" onclick="clearResults()">
+            <i class="bi bi-trash me-2"></i>Clear Results
+          </button>
+        </div>
+
+        <hr class="border-secondary"/>
+        <div class="payload-preview-box">
+          <div class="text-muted small mb-1">PAYLOAD PREVIEW</div>
+          <div id="payload-preview" class="payload-code">Select attack type and fire...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Results Panel -->
+  <div class="col-xl-8">
+    <div class="glass-card h-100">
+      <div class="card-header-cyber d-flex justify-content-between">
+        <span><i class="bi bi-terminal me-2"></i>Attack Results Feed</span>
+        <div class="d-flex gap-2 align-items-center">
+          <span class="badge bg-danger" id="sim-blocked-count">0 blocked</span>
+          <span class="badge bg-success" id="sim-allowed-count">0 allowed</span>
+        </div>
+      </div>
+      <div class="sim-terminal" id="sim-terminal">
+        <div class="terminal-welcome">
+          <pre class="welcome-ascii">
+   _____     _               _____ _        _     _     _ 
+  / ____|   | |             / ____| |      (_)   | |   | |
+ | |    _   _| |__   ___ _ | (___ | |__  ___ ___| | __| |
+ | |   | | | | '_ \ / _ \ '__\___ \| '_ \| |/ _ \ |/ _` |
+ | |___| |_| | |_) |  __/ |  ____) | | | | |  __/ | (_| |
+  \_____\__, |_.__/ \___|_| |_____/|_| |_|_|\___|_|\__,_|
+         __/ |                                              
+        |___/   Adaptive WAF · Attack Simulator v2.0</pre>
+          <p class="text-muted mt-2">Fire attacks to see WAF + RL decisions in real-time.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Stats Row -->
+<div class="row g-3 mb-3">
+  <div class="col-md-3">
+    <div class="glass-card text-center py-3">
+      <div class="text-cyber-green fs-2 fw-bold" id="sim-total">0</div>
+      <div class="text-muted small">Total Simulated</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="glass-card text-center py-3">
+      <div class="text-danger fs-2 fw-bold" id="sim-tp">0</div>
+      <div class="text-muted small">True Positives (Correct Blocks)</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="glass-card text-center py-3">
+      <div class="text-warning fs-2 fw-bold" id="sim-fp">0</div>
+      <div class="text-muted small">False Positives (Errors)</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="glass-card text-center py-3">
+      <div class="text-cyber-blue fs-2 fw-bold" id="sim-avg-score">0.000</div>
+      <div class="text-muted small">Avg Threat Score</div>
+    </div>
+  </div>
+</div>
+
+<!-- Demo Sequence Results -->
+<div class="glass-card d-none" id="demo-results">
+  <div class="card-header-cyber">
+    <i class="bi bi-play-circle me-2"></i>Demo Sequence — RL Adaptation Visualised
+  </div>
+  <div class="card-body">
+    <canvas id="demoChart" height="80"></canvas>
+    <div id="demo-steps-table" class="mt-3"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/simulator.js') }}"></script>
+{% endblock %}

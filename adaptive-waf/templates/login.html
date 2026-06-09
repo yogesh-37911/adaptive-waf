@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Login — Adaptive WAF</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css"/>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}"/>
+</head>
+<body class="login-body">
+  <div class="login-bg">
+    <div class="login-particles" id="particles"></div>
+    <div class="login-container">
+      <div class="login-card">
+        <div class="login-header">
+          <div class="login-logo">
+            <i class="bi bi-shield-fill-check"></i>
+          </div>
+          <h1 class="login-title">CyberShield AI</h1>
+          <p class="login-subtitle">Adaptive WAF · Reinforcement Learning Engine</p>
+          <div class="login-badges">
+            <span class="badge-tag">DQN Agent</span>
+            <span class="badge-tag">Real-time Detection</span>
+            <span class="badge-tag">Auto-tuning</span>
+          </div>
+        </div>
+
+        <div class="login-form-section">
+          {% if error %}
+          <div class="alert alert-danger d-flex align-items-center gap-2 py-2" role="alert">
+            <i class="bi bi-shield-exclamation"></i>
+            <span>{{ error }}</span>
+          </div>
+          {% endif %}
+
+          <form method="POST" action="{{ url_for('auth.login') }}" autocomplete="off">
+            <div class="form-floating mb-3">
+              <input type="text" class="form-control login-input" id="username"
+                     name="username" placeholder="Username" required autocomplete="off"/>
+              <label for="username"><i class="bi bi-person me-1"></i>Username</label>
+            </div>
+            <div class="form-floating mb-4">
+              <input type="password" class="form-control login-input" id="password"
+                     name="password" placeholder="Password" required/>
+              <label for="password"><i class="bi bi-lock me-1"></i>Password</label>
+            </div>
+            <button type="submit" class="btn btn-cyber w-100 py-2">
+              <i class="bi bi-shield-check me-2"></i>Access Control Panel
+            </button>
+          </form>
+        </div>
+
+        <div class="login-footer">
+          <div class="login-status-row">
+            <span class="status-indicator active"></span>
+            <span>WAF Engine Online</span>
+            <span class="mx-2">·</span>
+            <span class="status-indicator active"></span>
+            <span>RL Agent Running</span>
+          </div>
+          <div class="login-creds">Default: <code>admin / admin123</code></div>
+        </div>
+      </div>
+
+      <div class="login-info-panel">
+        <h5 class="info-title"><i class="bi bi-cpu me-2"></i>System Status</h5>
+        <div class="info-stat"><span>Engine</span><span class="text-cyber-green">Adaptive WAF v2.0</span></div>
+        <div class="info-stat"><span>RL Algorithm</span><span class="text-cyber-blue">Deep Q-Network</span></div>
+        <div class="info-stat"><span>State Space</span><span>12 dimensions</span></div>
+        <div class="info-stat"><span>Action Space</span><span>7 actions</span></div>
+        <div class="info-stat"><span>Attack Types</span><span>SQLi, XSS, CMDi, LFI…</span></div>
+        <hr class="border-secondary"/>
+        <div class="info-features">
+          <div class="feature-item"><i class="bi bi-check-circle-fill text-cyber-green"></i> Dynamic Rule Generation</div>
+          <div class="feature-item"><i class="bi bi-check-circle-fill text-cyber-green"></i> IP Auto-Blacklisting</div>
+          <div class="feature-item"><i class="bi bi-check-circle-fill text-cyber-green"></i> False Positive Minimisation</div>
+          <div class="feature-item"><i class="bi bi-check-circle-fill text-cyber-green"></i> Explainable AI Decisions</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+<script>
+  // Particle animation
+  const canvas = document.createElement('canvas');
+  const container = document.getElementById('particles');
+  container.appendChild(canvas);
+  const ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  const particles = Array.from({length: 60}, () => ({
+    x: Math.random()*canvas.width, y: Math.random()*canvas.height,
+    vx: (Math.random()-0.5)*0.4, vy: (Math.random()-0.5)*0.4,
+    r: Math.random()*2+0.5,
+    alpha: Math.random()*0.5+0.1
+  }));
+  function animParticles() {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    particles.forEach(p => {
+      p.x += p.vx; p.y += p.vy;
+      if (p.x<0||p.x>canvas.width) p.vx*=-1;
+      if (p.y<0||p.y>canvas.height) p.vy*=-1;
+      ctx.beginPath();
+      ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+      ctx.fillStyle=`rgba(0,255,136,${p.alpha})`;
+      ctx.fill();
+    });
+    // Draw connections
+    for (let i=0;i<particles.length;i++) {
+      for (let j=i+1;j<particles.length;j++) {
+        const dx=particles[i].x-particles[j].x, dy=particles[i].y-particles[j].y;
+        const dist=Math.sqrt(dx*dx+dy*dy);
+        if (dist<120) {
+          ctx.beginPath();
+          ctx.moveTo(particles[i].x,particles[i].y);
+          ctx.lineTo(particles[j].x,particles[j].y);
+          ctx.strokeStyle=`rgba(0,255,136,${0.08*(1-dist/120)})`;
+          ctx.lineWidth=0.5; ctx.stroke();
+        }
+      }
+    }
+    requestAnimationFrame(animParticles);
+  }
+  animParticles();
+  window.addEventListener('resize',()=>{
+    canvas.width=window.innerWidth; canvas.height=window.innerHeight;
+  });
+</script>
+</body>
+</html>

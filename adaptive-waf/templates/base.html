@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>{% block title %}Adaptive WAF{% endblock %} — CyberShield AI</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css"/>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}"/>
+  {% block extra_css %}{% endblock %}
+</head>
+<body>
+
+<!-- ── Sidebar ──────────────────────────────────────────────────────────── -->
+<div class="sidebar" id="sidebar">
+  <div class="sidebar-brand">
+    <div class="brand-icon"><i class="bi bi-shield-fill-check"></i></div>
+    <div class="brand-text">
+      <span class="brand-name">CyberShield</span>
+      <span class="brand-sub">Adaptive WAF · RL Engine</span>
+    </div>
+  </div>
+
+  <nav class="sidebar-nav">
+    <div class="nav-section-label">MONITORING</div>
+    <a href="{{ url_for('dashboard.index') }}"
+       class="nav-item {% if page=='dashboard' %}active{% endif %}">
+      <i class="bi bi-speedometer2"></i><span>Dashboard</span>
+      <span class="nav-badge live-badge">LIVE</span>
+    </a>
+    <a href="{{ url_for('analytics.index') }}"
+       class="nav-item {% if page=='analytics' %}active{% endif %}">
+      <i class="bi bi-bar-chart-line"></i><span>Analytics</span>
+    </a>
+
+    <div class="nav-section-label mt-2">SECURITY</div>
+    <a href="{{ url_for('firewall.index') }}"
+       class="nav-item {% if page=='firewall' %}active{% endif %}">
+      <i class="bi bi-fire"></i><span>Firewall Rules</span>
+    </a>
+    <a href="{{ url_for('simulator.index') }}"
+       class="nav-item {% if page=='simulator' %}active{% endif %}">
+      <i class="bi bi-bug-fill"></i><span>Attack Simulator</span>
+    </a>
+
+    <div class="nav-section-label mt-2">INTELLIGENCE</div>
+    <a href="{{ url_for('rl_insights.index') }}"
+       class="nav-item {% if page=='rl_insights' %}active{% endif %}">
+      <i class="bi bi-cpu-fill"></i><span>RL Insights</span>
+    </a>
+    <a href="{{ url_for('reports.index') }}"
+       class="nav-item {% if page=='reports' %}active{% endif %}">
+      <i class="bi bi-file-earmark-bar-graph"></i><span>Reports</span>
+    </a>
+
+    <div class="nav-section-label mt-2">SYSTEM</div>
+    <a href="{{ url_for('settings.index') }}"
+       class="nav-item {% if page=='settings' %}active{% endif %}">
+      <i class="bi bi-gear-fill"></i><span>Settings</span>
+    </a>
+    <a href="{{ url_for('auth.logout') }}" class="nav-item nav-item-danger">
+      <i class="bi bi-box-arrow-right"></i><span>Logout</span>
+    </a>
+  </nav>
+
+  <div class="sidebar-footer">
+    <div class="system-status">
+      <span class="status-dot" id="rl-status-dot"></span>
+      <span class="status-text">RL Engine <span id="rl-status-label">Active</span></span>
+    </div>
+    <div class="sensitivity-mini">
+      <span>Sensitivity</span>
+      <div class="mini-bar">
+        <div class="mini-bar-fill" id="sidebar-sensitivity"></div>
+      </div>
+      <span id="sidebar-sens-pct">50%</span>
+    </div>
+  </div>
+</div>
+
+<!-- ── Main Content ──────────────────────────────────────────────────────── -->
+<div class="main-content" id="main-content">
+
+  <!-- Top navbar -->
+  <nav class="top-navbar">
+    <button class="btn-sidebar-toggle" id="sidebar-toggle">
+      <i class="bi bi-list"></i>
+    </button>
+    <div class="navbar-breadcrumb">
+      <span class="breadcrumb-icon"><i class="bi bi-shield-fill-check text-cyber-green"></i></span>
+      <span class="breadcrumb-sep">/</span>
+      <span class="breadcrumb-page">{% block page_title %}Dashboard{% endblock %}</span>
+    </div>
+    <div class="navbar-right">
+      <div class="threat-meter-mini">
+        <span class="meter-label">Threat Level</span>
+        <div class="threat-bar-wrap">
+          <div class="threat-bar-fill" id="global-threat-bar" style="width:0%"></div>
+        </div>
+        <span class="meter-val" id="global-threat-pct">0%</span>
+      </div>
+      <div class="nav-time" id="nav-clock"></div>
+      <div class="nav-user">
+        <i class="bi bi-person-circle"></i>
+        <span>{{ username }}</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Alerts -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for cat, msg in messages %}
+      <div class="alert alert-{{ 'success' if cat=='success' else 'warning' }} alert-dismissible fade show mx-3 mt-2" role="alert">
+        {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+  {% endwith %}
+
+  <!-- Page content -->
+  <div class="page-wrapper">
+    {% block content %}{% endblock %}
+  </div>
+</div>
+
+<!-- Scripts -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+  // Sidebar toggle
+  document.getElementById('sidebar-toggle').addEventListener('click', () => {
+    document.getElementById('sidebar').classList.toggle('collapsed');
+    document.getElementById('main-content').classList.toggle('expanded');
+  });
+  // Clock
+  function updateClock() {
+    const now = new Date();
+    document.getElementById('nav-clock').textContent =
+      now.toUTCString().slice(0,25) + ' UTC';
+  }
+  updateClock(); setInterval(updateClock, 1000);
+
+  // Global stats polling (every 3s)
+  async function pollGlobalStats() {
+    try {
+      const r = await fetch('/api/stats');
+      const d = await r.json();
+      const sens = Math.round(d.sensitivity * 100);
+      document.getElementById('sidebar-sensitivity').style.width = sens + '%';
+      document.getElementById('sidebar-sens-pct').textContent = sens + '%';
+      const dot = document.getElementById('rl-status-dot');
+      dot.className = 'status-dot ' + (d.rl_steps > 0 ? 'active' : 'inactive');
+      // Global threat level (blocked/total ratio)
+      const threatPct = d.total > 0 ? Math.round(d.blocked/d.total*100) : 0;
+      document.getElementById('global-threat-bar').style.width = threatPct + '%';
+      document.getElementById('global-threat-bar').className =
+        'threat-bar-fill ' + (threatPct > 50 ? 'high' : threatPct > 25 ? 'med' : 'low');
+      document.getElementById('global-threat-pct').textContent = threatPct + '%';
+    } catch(e) {}
+  }
+  pollGlobalStats(); setInterval(pollGlobalStats, 3000);
+</script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

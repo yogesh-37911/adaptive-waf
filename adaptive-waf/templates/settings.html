@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block page_title %}System Settings{% endblock %}
+{% block content %}
+<div class="row g-3">
+  {% set categories = settings.values()|map(attribute='category')|unique|list %}
+  {% for cat in ['waf', 'rl', 'safety', 'general'] %}
+  {% set cat_settings = settings.values()|selectattr('category','equalto',cat)|list %}
+  {% if cat_settings %}
+  <div class="col-xl-6">
+    <div class="glass-card mb-4">
+      <div class="card-header-cyber">
+        <i class="bi bi-{% if cat=='waf' %}fire{% elif cat=='rl' %}cpu{% elif cat=='safety' %}shield-lock{% else %}gear{% endif %} me-2"></i>
+        {{ cat|upper }} Settings
+      </div>
+      <div class="card-body">
+        {% for s in cat_settings %}
+        <div class="setting-row mb-3">
+          <div class="d-flex justify-content-between align-items-start mb-1">
+            <label class="fw-semibold small">{{ s.setting_key.replace('_',' ')|title }}</label>
+            <span class="badge bg-secondary">{{ s.setting_type }}</span>
+          </div>
+          {% if s.description %}
+          <div class="text-muted small mb-1">{{ s.description }}</div>
+          {% endif %}
+          {% if s.setting_type == 'bool' %}
+          <div class="form-check form-switch">
+            <input class="form-check-input setting-toggle" type="checkbox"
+                   data-key="{{ s.setting_key }}"
+                   {% if s.setting_value.lower() in ('true','1') %}checked{% endif %}
+                   onchange="updateSetting('{{ s.setting_key }}', this.checked.toString())"/>
+          </div>
+          {% else %}
+          <div class="input-group input-group-sm">
+            <input type="{{ 'number' if s.setting_type in ('int','float') else 'text' }}"
+                   class="form-control bg-dark border-secondary font-monospace"
+                   value="{{ s.setting_value }}" id="setting-{{ s.setting_key }}"
+                   step="{{ '0.01' if s.setting_type == 'float' else '1' }}"/>
+            <button class="btn btn-outline-cyber btn-sm" onclick="saveSetting('{{ s.setting_key }}')">Save</button>
+          </div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+  {% endfor %}
+</div>
+
+<div class="glass-card">
+  <div class="card-header-cyber text-danger"><i class="bi bi-exclamation-triangle me-2"></i>Danger Zone</div>
+  <div class="card-body d-flex gap-3">
+    <button class="btn btn-outline-warning" onclick="resetRL()">
+      <i class="bi bi-arrow-clockwise me-2"></i>Reset RL Metrics
+    </button>
+    <button class="btn btn-outline-danger" onclick="if(confirm('Rollback sensitivity?'))rollbackSensitivity()">
+      <i class="bi bi-arrow-counterclockwise me-2"></i>Rollback Sensitivity
+    </button>
+  </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+async function updateSetting(key, value) {
+  const r = await fetch('/api/settings/update', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({key, value})
+  });
+  const d = await r.json();
+  showToast(d.success ? `✓ ${key} updated` : `✗ ${d.error}`, d.success ? 'success' : 'danger');
+}
+async function saveSetting(key) {
+  const input = document.getElementById('setting-' + key);
+  if (!input) return;
+  await updateSetting(key, input.value);
+}
+async function resetRL() {
+  if (!confirm('Reset all RL training metrics?')) return;
+  const r = await fetch('/api/settings/reset-rl', {method:'POST'});
+  showToast((await r.json()).success ? 'RL metrics reset' : 'Reset failed', 'info');
+}
+async function rollbackSensitivity() {
+  const r = await fetch('/api/settings/rollback', {method:'POST'});
+  const d = await r.json();
+  showToast(d.success ? `Sensitivity rolled back to ${Math.round(d.level*100)}%` : 'Rollback failed',
+            d.success ? 'success' : 'danger');
+}
+function showToast(msg, type='success') {
+  const t = document.createElement('div');
+  t.className = `toast-notification toast-${type}`;
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(), 3000);
+}
+</script>
+{% endblock %}

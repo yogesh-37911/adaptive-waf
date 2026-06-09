@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Live Dashboard{% endblock %}
+
+{% block content %}
+<!-- ── KPI Cards ─────────────────────────────────────────────────────────── -->
+<div class="row g-3 mb-4">
+  <div class="col-xl-2 col-lg-4 col-md-6">
+    <div class="kpi-card kpi-total">
+      <div class="kpi-icon"><i class="bi bi-activity"></i></div>
+      <div class="kpi-body">
+        <div class="kpi-value" id="kpi-total">{{ stats.total }}</div>
+        <div class="kpi-label">Total Requests</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-xl-2 col-lg-4 col-md-6">
+    <div class="kpi-card kpi-blocked">
+      <div class="kpi-icon"><i class="bi bi-slash-circle-fill"></i></div>
+      <div class="kpi-body">
+        <div class="kpi-value text-danger" id="kpi-blocked">{{ stats.blocked }}</div>
+        <div class="kpi-label">Blocked</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-xl-2 col-lg-4 col-md-6">
+    <div class="kpi-card kpi-allowed">
+      <div class="kpi-icon"><i class="bi bi-check-circle-fill"></i></div>
+      <div class="kpi-body">
+        <div class="kpi-value text-success" id="kpi-allowed">{{ stats.allowed }}</div>
+        <div class="kpi-label">Allowed</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-xl-2 col-lg-4 col-md-6">
+    <div class="kpi-card kpi-attacks">
+      <div class="kpi-icon"><i class="bi bi-bug-fill"></i></div>
+      <div class="kpi-body">
+        <div class="kpi-value text-warning" id="kpi-attacks">{{ stats.attacks }}</div>
+        <div class="kpi-label">Attacks Detected</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-xl-2 col-lg-4 col-md-6">
+    <div class="kpi-card kpi-rl">
+      <div class="kpi-icon"><i class="bi bi-cpu-fill"></i></div>
+      <div class="kpi-body">
+        <div class="kpi-value text-cyber-green" id="kpi-rl-steps">{{ agent_stats.steps or 0 }}</div>
+        <div class="kpi-label">RL Training Steps</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-xl-2 col-lg-4 col-md-6">
+    <div class="kpi-card kpi-blocked-ips">
+      <div class="kpi-icon"><i class="bi bi-ban"></i></div>
+      <div class="kpi-body">
+        <div class="kpi-value text-danger" id="kpi-blocked-ips">{{ blocked_ips|length }}</div>
+        <div class="kpi-label">Blocked IPs</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── WAF Sensitivity + RL Reward ──────────────────────────────────────── -->
+<div class="row g-3 mb-4">
+  <div class="col-xl-8">
+    <div class="glass-card h-100">
+      <div class="card-header-cyber">
+        <span><i class="bi bi-graph-up-arrow me-2"></i>RL Reward & Loss — Live Training</span>
+        <span class="badge bg-cyber-green text-dark ms-2">Real-time</span>
+      </div>
+      <div class="card-body">
+        <canvas id="rlRewardChart" height="110"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-xl-4">
+    <div class="glass-card h-100">
+      <div class="card-header-cyber">
+        <i class="bi bi-toggles me-2"></i>WAF Sensitivity Control
+      </div>
+      <div class="card-body d-flex flex-column gap-3">
+        <div class="sensitivity-gauge-wrap">
+          <canvas id="sensitivityGauge" width="180" height="100"></canvas>
+          <div class="gauge-center-text">
+            <div class="gauge-value" id="gauge-value">{{ sensitivity }}%</div>
+            <div class="gauge-label">Sensitivity</div>
+          </div>
+        </div>
+        <input type="range" class="form-range cyber-range" id="sens-slider"
+               min="10" max="95" value="{{ sensitivity }}"
+               oninput="updateSensitivity(this.value)"/>
+        <div class="d-flex justify-content-between gap-2">
+          <button class="btn btn-sm btn-outline-success flex-fill" onclick="setSens(30)">
+            <i class="bi bi-unlock"></i> Loose
+          </button>
+          <button class="btn btn-sm btn-outline-warning flex-fill" onclick="setSens(50)">
+            <i class="bi bi-dash-circle"></i> Normal
+          </button>
+          <button class="btn btn-sm btn-outline-danger flex-fill" onclick="setSens(80)">
+            <i class="bi bi-lock-fill"></i> Tight
+          </button>
+        </div>
+        <div class="rl-mini-stats">
+          <div class="rl-stat"><span>ε Epsilon</span><span class="text-cyber-blue" id="dash-epsilon">{{ agent_stats.epsilon or '—' }}</span></div>
+          <div class="rl-stat"><span>Avg Reward</span><span class="text-cyber-green" id="dash-reward">{{ agent_stats.avg_reward_100 or '—' }}</span></div>
+          <div class="rl-stat"><span>Active Rules</span><span id="dash-rules">—</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Charts Row ────────────────────────────────────────────────────────── -->
+<div class="row g-3 mb-4">
+  <div class="col-xl-5">
+    <div class="glass-card h-100">
+      <div class="card-header-cyber">
+        <i class="bi bi-pie-chart-fill me-2"></i>Attack Distribution
+      </div>
+      <div class="card-body">
+        <canvas id="attackDistChart" height="200"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-xl-7">
+    <div class="glass-card h-100">
+      <div class="card-header-cyber">
+        <i class="bi bi-bar-chart-fill me-2"></i>Traffic Timeline (24h)
+      </div>
+      <div class="card-body">
+        <canvas id="timelineChart" height="200"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Live Feed + Top IPs ───────────────────────────────────────────────── -->
+<div class="row g-3 mb-4">
+  <div class="col-xl-7">
+    <div class="glass-card">
+      <div class="card-header-cyber d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-terminal-fill me-2"></i>Live Request Feed</span>
+        <div class="d-flex gap-2">
+          <span class="badge bg-success" id="feed-count">0 requests</span>
+          <button class="btn btn-xs btn-outline-secondary" onclick="toggleFeed()" id="feed-toggle">Pause</button>
+        </div>
+      </div>
+      <div class="terminal-feed" id="live-feed">
+        <div class="feed-placeholder"><i class="bi bi-hourglass-split me-2"></i>Waiting for traffic…</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-xl-5">
+    <div class="glass-card">
+      <div class="card-header-cyber">
+        <i class="bi bi-geo-alt-fill me-2"></i>Top Suspicious IPs
+      </div>
+      <div class="table-responsive">
+        <table class="table table-dark table-hover table-sm mb-0 cyber-table">
+          <thead><tr>
+            <th>IP Address</th><th>Requests</th><th>Blocked</th><th>Avg Score</th>
+          </tr></thead>
+          <tbody id="top-ips-tbody">
+            {% for ip in top_ips %}
+            <tr>
+              <td><code class="text-cyber-green">{{ ip.ip_address }}</code></td>
+              <td>{{ ip.total }}</td>
+              <td><span class="badge bg-danger">{{ ip.blocked }}</span></td>
+              <td>
+                <div class="score-bar-wrap">
+                  <div class="score-bar" style="width:{{ (ip.avg_score*100)|int }}%"></div>
+                  <span>{{ "%.2f"|format(ip.avg_score) }}</span>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <!-- Recent Attacks -->
+    <div class="glass-card mt-3">
+      <div class="card-header-cyber">
+        <i class="bi bi-exclamation-triangle-fill me-2 text-warning"></i>Recent Attacks
+      </div>
+      <div id="recent-attacks-list">
+        {% for a in recent_atks %}
+        <div class="attack-row severity-{{ a.severity }}">
+          <div class="attack-info">
+            <span class="attack-badge badge-{{ a.attack_type }}">{{ a.attack_type|upper }}</span>
+            <code class="text-muted small">{{ a.ip_address }}</code>
+          </div>
+          <div class="attack-meta">
+            <span class="{% if a.blocked %}text-danger{% else %}text-warning{% endif %}">
+              {% if a.blocked %}<i class="bi bi-slash-circle"></i> BLOCKED{% else %}<i class="bi bi-exclamation-circle"></i> PASSED{% endif %}
+            </span>
+            <span class="text-muted small">{{ "%.2f"|format(a.threat_score) }}</span>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if demo_mode %}
+<div class="alert alert-cyber-info d-flex align-items-center gap-3">
+  <i class="bi bi-info-circle-fill fs-4"></i>
+  <div>
+    <strong>Demo Mode Active</strong> — Navigate to
+    <a href="{{ url_for('simulator.index') }}" class="alert-link">Attack Simulator</a>
+    to run the guided demonstration sequence.
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% endblock %}
